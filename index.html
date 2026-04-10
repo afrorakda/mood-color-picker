@@ -13,7 +13,6 @@
             --main: #333;
             --bg: #fff;
             --accent: #eee;
-            --input-bg: #fafafa;
             --radius: 15px;
             --text-gray: #666;
         }
@@ -30,6 +29,7 @@
             user-select: none;
             -webkit-user-select: none;
             overflow: hidden;
+            touch-action: manipulation;
         }
 
         .container {
@@ -46,76 +46,72 @@
         h1 { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -1px; }
         .subtitle { font-size: 0.85rem; color: var(--text-gray); font-weight: 600; margin-top: 4px; }
 
-        /* カラーピッカーエリア */
-        .picker-wrapper {
+        .input-wrapper {
             position: relative;
             flex-grow: 1;
-            min-height: 300px;
+            min-height: 350px;
             margin-bottom: 20px;
             border-radius: var(--radius);
             overflow: hidden;
             border: 2px solid var(--accent);
             background: #fff;
-            cursor: crosshair;
         }
 
         #colorCanvas {
             width: 100%;
             height: 100%;
             display: block;
+            cursor: crosshair;
         }
 
-        /* 結果表示オーバーレイ */
+        /* 結果表示オーバーレイ：エリア全体を染める */
         #resultOverlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #fff;
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
             z-index: 5;
-            animation: fadeIn 0.3s ease;
+            animation: fadeIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         }
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .mood-card {
-            width: 120px;
-            height: 120px;
-            border-radius: var(--radius);
-            margin-bottom: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-            border: 4px solid #fff;
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(1.05); } to { opacity: 1; transform: scale(1); } }
 
         .mood-keyword {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin-bottom: 5px;
-            letter-spacing: -0.5px;
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
         }
 
         .mood-desc {
-            font-size: 0.9rem;
-            color: var(--text-gray);
+            font-size: 1rem;
             font-weight: 600;
-            margin-bottom: 25px;
+            margin-bottom: 40px;
+            max-width: 80%;
+            line-height: 1.4;
         }
 
         .reset-btn {
-            background: var(--main);
-            color: #fff;
-            border: none;
-            padding: 12px 25px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            color: inherit;
+            border: 2px solid currentColor;
+            padding: 14px 30px;
             border-radius: var(--radius);
             font-size: 0.9rem;
             font-weight: 800;
             cursor: pointer;
+            transition: all 0.2s;
         }
+        .reset-btn:active { transform: scale(0.95); opacity: 0.8; }
 
         .footer-btns { display: flex; gap: 10px; margin-bottom: 20px; z-index: 10; }
         .kofi-btn { flex: 6; background: var(--main); color: #fff; padding: 12px; border-radius: var(--radius); text-decoration: none; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; }
@@ -125,7 +121,7 @@
         footer a { color: inherit; text-decoration: underline; }
 
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 100; }
-        .modal-content { background: #fff; width: 85%; max-width: 340px; padding: 30px; border-radius: var(--radius); text-align: left; position: relative; }
+        .modal-content { background: #fff; width: 85%; max-width: 340px; padding: 30px; border-radius: var(--radius); text-align: left; position: relative; color: var(--main); }
         .close-x { position: absolute; top: 15px; right: 20px; font-size: 24px; color: #888; cursor: pointer; }
     </style>
 </head>
@@ -134,13 +130,12 @@
 <div class="container">
     <header>
         <h1>Mood Color Picker</h1>
-        <p class="subtitle">Tap the color that matches your soul.</p>
+        <p class="subtitle">Extract the color of your current mood.</p>
     </header>
 
-    <div class="input-wrapper picker-wrapper">
+    <div class="input-wrapper">
         <canvas id="colorCanvas"></canvas>
         <div id="resultOverlay">
-            <div class="mood-card" id="moodCard"></div>
             <div class="mood-keyword" id="moodKeyword">Analyzing...</div>
             <div class="mood-desc" id="moodDesc">Your current state.</div>
             <button class="reset-btn" onclick="resetPicker()">Pick Again</button>
@@ -172,7 +167,6 @@
     const canvas = document.getElementById('colorCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const overlay = document.getElementById('resultOverlay');
-    const moodCard = document.getElementById('moodCard');
     const moodKeyword = document.getElementById('moodKeyword');
     const moodDesc = document.getElementById('moodDesc');
 
@@ -181,31 +175,31 @@
         canvas.width = rect.width;
         canvas.height = rect.height;
 
-        // グラデーション作成 (彩度と明度のマップ)
+        // 横方向：色相グラデーション
         const gradH = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        for(let i=0; i<=360; i+=30) {
+        for(let i=0; i<=360; i+=20) {
             gradH.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
         }
         ctx.fillStyle = gradH;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // 縦方向：明度と彩度のオーバーレイ
         const gradV = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradV.addColorStop(0, 'rgba(255,255,255,1)');
-        gradV.addColorStop(0.5, 'rgba(255,255,255,0)');
-        gradV.addColorStop(0.5, 'rgba(0,0,0,0)');
-        gradV.addColorStop(1, 'rgba(0,0,0,1)');
+        gradV.addColorStop(0, 'white');
+        gradV.addColorStop(0.48, 'rgba(255,255,255,0)');
+        gradV.addColorStop(0.52, 'rgba(0,0,0,0)');
+        gradV.addColorStop(1, 'black');
         ctx.fillStyle = gradV;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 色彩心理学データ (トーンB: 心理的・分析的)
     const moodMap = [
-        { h: [0, 20], word: "Passion", desc: "High energy and strong drive." },
-        { h: [21, 50], word: "Creativity", desc: "Optimistic and social energy." },
-        { h: [51, 80], word: "Clarity", desc: "Intellectual focus and joy." },
-        { h: [81, 160], word: "Restoration", desc: "Balance and natural healing." },
-        { h: [161, 200], word: "Serenity", desc: "Deep calm and communication." },
-        { h: [201, 260], word: "Focus", desc: "Logic and inner peace." },
+        { h: [0, 20], word: "Passion", desc: "Intense energy and drive." },
+        { h: [21, 50], word: "Creativity", desc: "Optimism and social warmth." },
+        { h: [51, 80], word: "Clarity", desc: "Focus, intellect, and joy." },
+        { h: [81, 160], word: "Restoration", desc: "Natural balance and healing." },
+        { h: [161, 200], word: "Serenity", desc: "Calm and clear communication." },
+        { h: [201, 260], word: "Focus", desc: "Logic, truth, and inner peace." },
         { h: [261, 300], word: "Intuition", desc: "Spiritual depth and mystery." },
         { h: [301, 359], word: "Affection", desc: "Compassion and gentle care." }
     ];
@@ -228,6 +222,12 @@
         return [h * 360, s * 100, l * 100];
     }
 
+    // 輝度（Y）を計算して文字色を決める
+    function getContrastColor(r, g, b) {
+        const y = (0.299 * r + 0.587 * g + 0.114 * b);
+        return y > 140 ? '#333' : '#fff';
+    }
+
     canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -235,24 +235,25 @@
         const pixel = ctx.getImageData(x, y, 1, 1).data;
         const rgb = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
         const hsl = rgbToHsl(pixel[0], pixel[1], pixel[2]);
+        const textColor = getContrastColor(pixel[0], pixel[1], pixel[2]);
 
-        showResult(rgb, hsl);
+        showResult(rgb, hsl, textColor);
     });
 
-    function showResult(rgb, hsl) {
+    function showResult(rgb, hsl, textColor) {
         const h = hsl[0];
         const s = hsl[1];
         const l = hsl[2];
 
         let result = { word: "Neutral", desc: "A state of pure potential." };
-
         if (s < 15) {
-            result = l > 50 ? { word: "Openness", desc: "Ready for new impressions." } : { word: "Depth", desc: "Quiet reflection and stability." };
+            result = l > 50 ? { word: "Openness", desc: "Ready for new beginnings." } : { word: "Depth", desc: "Quiet reflection and stability." };
         } else {
             result = moodMap.find(m => h >= m.h[0] && h <= m.h[1]) || result;
         }
 
-        moodCard.style.backgroundColor = rgb;
+        overlay.style.backgroundColor = rgb;
+        overlay.style.color = textColor;
         moodKeyword.innerText = result.word;
         moodDesc.innerText = result.desc;
         overlay.style.display = 'flex';
