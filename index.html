@@ -1,25 +1,323 @@
-# Mood Color Picker
-A non-verbal mirror for your mind. Extract your current emotional state through the simple act of choosing a color.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mood Color Picker</title>
+    
+    <link rel="icon" href="image_110.png">
+    <link rel="apple-touch-icon" href="image_110.png">
 
-## 🚀 Concept: Emotion Without Words
-In a world overflowing with information and the pressure to articulate everything, we often lose touch with how we truly feel. Mood Color Picker bypasses the complexity of language. By dragging your finger across a spectrum and releasing it on the color that "feels right," you gain an immediate, intuitive snapshot of your internal state.
+    <style>
+        :root {
+            --main: #333;
+            --bg: #fff;
+            --accent: #eee;
+            --radius: 15px;
+            --text-gray: #666;
+        }
 
-## ✨ Features
-- **Tactile Exploration:** Drag your finger across the full-screen gradient to explore the nuances of color. The final decision happens the moment you release your touch.
-- **Psychological Insight:** Based on color psychology, each selection is mapped to a "Mood Keyword" and a brief analytical description to help you categorize your current energy.
-- **Immersive Result:** The entire interface transforms into your chosen color, allowing you to "soak" in the mood without distracting UI elements.
-- **Dynamic Contrast:** Smart logic automatically adjusts text color (black or white) based on the brightness of your selection, ensuring perfect legibility every time.
-- **One-Tap Reset:** Tap anywhere on the result screen to instantly return to the picker. No hunting for small buttons.
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
 
-## 🛠 How to Use
-1. **Explore:** Drag your finger (or mouse) over the color canvas.
-2. **Decide:** Release when you find the color that resonates with your current mood.
-3. **Reflect:** Read the keyword and description. Take a moment to acknowledge that feeling.
-4. **Repeat:** Tap the screen to reset and find a new color whenever your mood shifts.
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            /* 選択禁止を徹底 */
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            /* スクロール防止 */
+            touch-action: none;
+        }
 
-## 📐 The Philosophy
-This tool is a "digital detox" for your emotions. It follows the "1 Tool / 1 Action" rule by focusing solely on the transition from visual intuition to self-awareness. It doesn't track you or save your data—it only exists to serve your present moment.
+        .container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+        }
 
----
-**No login / No tracking / No ads / Browser only**
-Developed by afrorakda © 2026
+        header { margin-bottom: 15px; z-index: 10; pointer-events: none; }
+        h1 { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -1px; }
+        .subtitle { font-size: 0.85rem; color: var(--text-gray); font-weight: 600; margin-top: 4px; }
+
+        .input-wrapper {
+            position: relative;
+            flex-grow: 1;
+            min-height: 350px;
+            margin-bottom: 20px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 2px solid var(--accent);
+            background: #fff;
+            touch-action: none; /* ドキュメント全体のスクロールを防ぐ */
+        }
+
+        #colorCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* 結果表示オーバーレイ：エリア全体を染める */
+        #resultOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            box-sizing: border-box;
+            z-index: 5;
+            cursor: pointer; /* 画面全体タップで戻れることを明示 */
+            animation: fadeIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(1.05); } to { opacity: 1; transform: scale(1); } }
+
+        .mood-keyword {
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+            pointer-events: none; /* テキスト選択を禁止 */
+        }
+
+        .mood-desc {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 40px;
+            max-width: 80%;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        /* ボタンは視覚的なガイドとして残すが、画面全体でタップを検知する */
+        .reset-guide {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            color: inherit;
+            border: 2px solid currentColor;
+            padding: 14px 30px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 800;
+            pointer-events: none;
+            transition: all 0.2s;
+        }
+        #resultOverlay:active .reset-guide { transform: scale(0.95); opacity: 0.8; }
+
+        .footer-btns { display: flex; gap: 10px; margin-bottom: 20px; z-index: 10; }
+        .kofi-btn { flex: 6; background: var(--main); color: #fff; padding: 12px; border-radius: var(--radius); text-decoration: none; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+        .home-btn { flex: 4; background: var(--accent); color: var(--main); border: none; padding: 12px; border-radius: var(--radius); font-weight: 800; font-size: 12px; cursor: pointer; }
+
+        footer { font-size: 10px; color: #aaa; line-height: 1.6; font-weight: 500; padding-bottom: 10px; z-index: 10; pointer-events: none; }
+        footer a { color: inherit; text-decoration: underline; pointer-events: auto; }
+
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 100; touch-action: auto; }
+        .modal-content { background: #fff; width: 85%; max-width: 340px; padding: 30px; border-radius: var(--radius); text-align: left; position: relative; color: var(--main); user-select: text; -webkit-user-select: text;}
+        .close-x { position: absolute; top: 15px; right: 20px; font-size: 24px; color: #888; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Mood Color Picker</h1>
+        <p class="subtitle">Drag to find, release to decide your mood.</p>
+    </header>
+
+    <div class="input-wrapper" id="canvasWrapper">
+        <canvas id="colorCanvas"></canvas>
+        <div id="resultOverlay" onclick="resetPicker()">
+            <div class="mood-keyword" id="moodKeyword">Analyzing...</div>
+            <div class="mood-desc" id="moodDesc">Your current state.</div>
+            <div class="reset-guide">Tap Anywhere</div>
+        </div>
+    </div>
+
+    <div class="footer-btns">
+        <a href="https://ko-fi.com/afrorakda" target="_blank" class="kofi-btn">☕️buy me a coffee</a>
+        <button class="home-btn" onclick="showModal()">Add Home</button>
+    </div>
+
+    <footer>
+        <div>No login / No tracking / No ads / Browser only</div>
+        <div><a href="https://afrorakda.com/privacy/">Privacy Policy</a> / afrorakda © 2026</div>
+    </footer>
+</div>
+
+<div id="modal" onclick="hideModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="close-x" onclick="hideModal()">×</span>
+        <h3>📱 Install</h3>
+        <p>Add to your home screen.</p>
+        <p>🍏 <strong>iPhone (Safari):</strong><br>Tap Share, then Add to Home Screen.</p>
+        <p>🤖 <strong>Android (Chrome):</strong><br>Tap Menu (⋮), then Add to Home Screen.</p>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('colorCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const overlay = document.getElementById('resultOverlay');
+    const moodKeyword = document.getElementById('moodKeyword');
+    const moodDesc = document.getElementById('moodDesc');
+    const wrapper = document.getElementById('canvasWrapper');
+
+    let isDrawing = false;
+
+    function initCanvas() {
+        const rect = canvas.parentNode.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        // 横方向：色相グラデーション
+        const gradH = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        for(let i=0; i<=360; i+=20) {
+            gradH.addColorStop(i/360, `hsl(${i}, 100%, 50%)`);
+        }
+        ctx.fillStyle = gradH;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 縦方向：明度と彩度のオーバーレイ
+        const gradV = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradV.addColorStop(0, 'white');
+        gradV.addColorStop(0.48, 'rgba(255,255,255,0)');
+        gradV.addColorStop(0.52, 'rgba(0,0,0,0)');
+        gradV.addColorStop(1, 'black');
+        ctx.fillStyle = gradV;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const moodMap = [
+        { h: [0, 20], word: "Passion", desc: "Intense energy and strong drive." },
+        { h: [21, 50], word: "Creativity", desc: "Optimism and social warmth." },
+        { h: [51, 80], word: "Clarity", desc: "Focus, intellect, and joy." },
+        { h: [81, 160], word: "Restoration", desc: "Natural balance and healing." },
+        { h: [161, 200], word: "Serenity", desc: "Calm and clear communication." },
+        { h: [201, 260], word: "Focus", desc: "Logic, truth, and inner peace." },
+        { h: [261, 300], word: "Intuition", desc: "Spiritual depth and mystery." },
+        { h: [301, 359], word: "Affection", desc: "Compassion and gentle care." }
+    ];
+
+    function rgbToHsl(r, g, b) {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        if (max === min) h = s = 0;
+        else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return [h * 360, s * 100, l * 100];
+    }
+
+    function getContrastColor(r, g, b) {
+        const y = (0.299 * r + 0.587 * g + 0.114 * b);
+        return y > 140 ? '#333' : '#fff';
+    }
+
+    // 座標から色を取得して結果を表示する共通関数
+    function pickColor(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        let x = clientX - rect.left;
+        let y = clientY - rect.top;
+        
+        // キャンバスの範囲内にクランプ
+        x = Math.max(0, Math.min(x, canvas.width - 1));
+        y = Math.max(0, Math.min(y, canvas.height - 1));
+
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        const rgb = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+        const hsl = rgbToHsl(pixel[0], pixel[1], pixel[2]);
+        const textColor = getContrastColor(pixel[0], pixel[1], pixel[2]);
+
+        showResult(rgb, hsl, textColor);
+    }
+
+    // マウス/タッチイベントの登録（ドラッグ対応）
+    function handleStart(e) {
+        if (overlay.style.display === 'flex') return;
+        isDrawing = true;
+        // 開始時にも色を決定したい場合はここをコメントアウト解除
+        // const pos = e.touches ? e.touches[0] : e;
+        // pickColor(pos.clientX, pos.clientY);
+    }
+
+    function handleMove(e) {
+        if (!isDrawing) return;
+        // ドラッグ中は画面全体のスクロールを完全に防止
+        e.preventDefault(); 
+    }
+
+    function handleEnd(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        // 指を離した場所のイベントデータを取得
+        const pos = e.changedTouches ? e.changedTouches[0] : e;
+        pickColor(pos.clientX, pos.clientY);
+    }
+
+    // イベントリスナー登録
+    wrapper.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove); // window全体でmoveを検知
+    window.addEventListener('mouseup', handleEnd);
+
+    wrapper.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false }); // window全体でmoveを検知
+    window.addEventListener('touchend', handleEnd);
+
+    function showResult(rgb, hsl, textColor) {
+        const h = hsl[0], s = hsl[1], l = hsl[2];
+        let result = { word: "Neutral", desc: "A state of pure potential." };
+        if (s < 15) {
+            result = l > 50 ? { word: "Openness", desc: "Ready for new beginnings." } : { word: "Depth", desc: "Quiet reflection and stability." };
+        } else {
+            result = moodMap.find(m => h >= m.h[0] && h <= m.h[1]) || result;
+        }
+
+        overlay.style.backgroundColor = rgb;
+        overlay.style.color = textColor;
+        moodKeyword.innerText = result.word;
+        moodDesc.innerText = result.desc;
+        overlay.style.display = 'flex';
+    }
+
+    function resetPicker() {
+        overlay.style.display = 'none';
+    }
+
+    function showModal() { document.getElementById('modal').style.display = 'flex'; }
+    function hideModal() { document.getElementById('modal').style.display = 'none'; }
+
+    window.addEventListener('load', initCanvas);
+    window.addEventListener('resize', initCanvas);
+</script>
+
+</body>
+</html>
